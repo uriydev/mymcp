@@ -21,14 +21,8 @@ async function main() {
 
   console.error("Smart Revit MCP Server started successfully!");
   console.error("Available tools:");
-  console.error("- smart_create_duct: Create intelligent ductwork with obstacle avoidance");
-  console.error("- smart_create_pipe: Create intelligent piping with optimal routing");
-  console.error("- analyze_building_space: Analyze building space for optimal placement");
-  console.error("- find_optimal_route: Find optimal MEP routing between points");
-  console.error("- revit_health_check: Check connection status with Revit");
+  console.error("- execute_dynamic_revit_command: Выполнение любых команд на естественном языке");
+  console.error("- revit_health_check: Проверка соединения с Revit");
 }
 
-main().catch((error) => {
-  console.error("Error starting Smart Revit MCP Server:", error);
-  process.exit(1);
-}); 
+main(); 

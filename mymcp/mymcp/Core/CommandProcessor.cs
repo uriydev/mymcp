@@ -49,17 +49,11 @@ public class CommandProcessor
 
             return commandName switch
             {
-                // Статические команды (существующие)
-                "smart_create_pipe" => ProcessSmartCreatePipe(parameters),
-                "analyze_space" => ProcessAnalyzeSpace(parameters),
-                "find_optimal_route" => ProcessFindOptimalRoute(parameters),
-                "get_obstacles" => ProcessGetObstacles(parameters),
+                // Оставляем только health_check
                 "health_check" => ProcessHealthCheck(),
-                
                 // Динамические команды
                 "execute_dynamic_command" => ProcessDynamicCommand(parameters),
                 "test_fixed_dynamic_command" => ProcessTestFixedDynamicCommand(parameters),
-                
                 _ => new { success = false, error = $"Unknown command: {commandName}" }
             };
         }

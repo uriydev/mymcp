@@ -50,11 +50,5 @@ public class Application : ExternalApplication
             .SetImage("/mymcp;component/Resources/Icons/RibbonIcon16.png")
             .SetLargeImage("/mymcp;component/Resources/Icons/RibbonIcon32.png")
             .SetToolTip("Запустить/остановить MCP сервер для связи с Cursor");
-
-        panel.AddSeparator();
-
-        // В будущем добавим больше умных команд
-        // panel.AddPushButton<SmartCreatePipeCommand>("Smart Pipe")
-        // panel.AddPushButton<SmartCreateElectricalCommand>("Smart Electrical")
     }
 }

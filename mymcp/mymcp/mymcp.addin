@@ -1,0 +1,11 @@
+﻿<RevitAddIns>
+    <AddIn Type="Application">
+        <Name>mymcp</Name>
+        <Assembly>mymcp/mymcp.dll</Assembly>
+        <AddInId>47B58C80-13C7-4D9E-AFE4-0A81C20AAF52</AddInId>
+        <FullClassName>mymcp.Application</FullClassName>
+        <VendorId>Development</VendorId>
+        <VendorDescription></VendorDescription>
+        <VendorEmail></VendorEmail>
+    </AddIn>
+</RevitAddIns>

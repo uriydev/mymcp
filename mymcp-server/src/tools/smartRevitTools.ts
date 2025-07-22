@@ -4,6 +4,21 @@ import { RevitConnection } from "../utils/revitConnection.js";
 
 const revitConnection = new RevitConnection();
 
+interface DynamicCommandArgs {
+  command_description: string;
+  complexity_level: "simple" | "moderate" | "complex" | "advanced";
+  safety_mode: boolean;
+  optimization_level: "speed" | "quality" | "balanced";
+  parameters?: Record<string, any>;
+}
+
+interface PipeCommandArgs {
+  start_point: { x: number; y: number; z: number };
+  end_point: { x: number; y: number; z: number };
+  diameter: number;
+  system_type?: string;
+}
+
 export function registerSmartRevitTools(server: McpServer) {
   
   // ====== НОВЫЙ УНИВЕРСАЛЬНЫЙ ИНСТРУМЕНТ ДЛЯ ДИНАМИЧЕСКИХ КОМАНД ======
@@ -17,46 +32,31 @@ export function registerSmartRevitTools(server: McpServer) {
       optimization_level: z.enum(["speed", "quality", "balanced"]).default("balanced").describe("Optimization focus: speed for quick results, quality for best output, balanced for both"),
       parameters: z.record(z.any()).optional().describe("Additional parameters as key-value pairs (coordinates, sizes, etc.)")
     },
-    async (args) => {
+    async (args: DynamicCommandArgs) => {
       try {
         const response = await revitConnection.sendCommand("execute_dynamic_command", {
           description: args.command_description,
           complexity: args.complexity_level,
           safety: args.safety_mode,
           optimization: args.optimization_level,
-          parameters: args.parameters || {}
+          params: args.parameters
         });
 
         if (response.success) {
           return {
             content: [{
               type: "text",
-              text: `🎯 **Динамическая команда выполнена успешно!**\n\n` +
-                    `📝 **Описание:** ${args.command_description}\n` +
-                    `⚙️ **Сгенерировано кода:** ${response.generatedLines || 0} строк\n` +
-                    `⏱️ **Время выполнения:** ${response.executionTime || 0}мс\n` +
-                    `📊 **Сложность:** ${args.complexity_level}\n` +
-                    `🛡️ **Безопасность:** ${args.safety_mode ? 'включена' : 'отключена'}\n` +
-                    `🎛️ **Оптимизация:** ${args.optimization_level}\n\n` +
-                    `✅ **Результат:** ${response.message}\n\n` +
-                    `${response.details || 'Команда завершена успешно!'}\n\n` +
-                    `${response.warnings && response.warnings.length > 0 ? 
-                      `⚠️ **Предупреждения:**\n${response.warnings.map((w: string) => `• ${w}`).join('\n')}\n\n` : ''
-                    }` +
-                    `🆔 **Элементы:** создано ${response.elementsCreated || 0}, изменено ${response.elementsModified || 0}`
+              text: `✅ **Команда выполнена успешно!**\n\n` +
+                    `📊 **Результат:**\n${response.result}\n\n` +
+                    `⏱️ **Время выполнения:** ${response.executionTime}мс\n` +
+                    `💬 **Сообщение:** ${response.message}`
             }]
           };
         } else {
           return {
             content: [{
               type: "text",
-              text: `❌ **Ошибка выполнения динамической команды**\n\n` +
-                    `📝 **Описание:** ${args.command_description}\n` +
-                    `❗ **Ошибка:** ${response.error}\n` +
-                    `⏱️ **Время выполнения:** ${response.executionTime || 0}мс\n\n` +
-                    `${response.warnings && response.warnings.length > 0 ? 
-                      `⚠️ **Предупреждения:**\n${response.warnings.map((w: string) => `• ${w}`).join('\n')}` : ''
-                    }`
+              text: `❌ **Ошибка выполнения команды:** ${response.error}`
             }]
           };
         }
@@ -64,13 +64,7 @@ export function registerSmartRevitTools(server: McpServer) {
         return {
           content: [{
             type: "text",
-            text: `💥 **Критическая ошибка при выполнении динамической команды**\n\n` +
-                  `📝 **Описание:** ${args.command_description}\n` +
-                  `❗ **Ошибка:** ${error instanceof Error ? error.message : String(error)}\n\n` +
-                  `🔧 **Рекомендации:**\n` +
-                  `• Проверьте подключение к Revit\n` +
-                  `• Убедитесь что документ открыт\n` +
-                  `• Попробуйте более простое описание`
+            text: `💥 **Ошибка подключения:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
           }]
         };
       }
@@ -79,6 +73,62 @@ export function registerSmartRevitTools(server: McpServer) {
 
   // ====== СУЩЕСТВУЮЩИЕ СПЕЦИАЛИЗИРОВАННЫЕ ИНСТРУМЕНТЫ ======
   
+  server.tool(
+    "smart_create_pipe",
+    "Create intelligent piping with optimal routing and system integration",
+    {
+      start_point: z.object({
+        x: z.number(),
+        y: z.number(),
+        z: z.number()
+      }).describe("Starting point coordinates in Revit units"),
+      end_point: z.object({
+        x: z.number(),
+        y: z.number(),
+        z: z.number()
+      }).describe("Ending point coordinates in Revit units"),
+      diameter: z.number().default(0.5).describe("Pipe diameter in feet"),
+      system_type: z.string().optional().describe("Plumbing system type")
+    },
+    async (args: PipeCommandArgs) => {
+      try {
+        const response = await revitConnection.sendCommand("smart_create_pipe", {
+          start: args.start_point,
+          end: args.end_point,
+          diameter: args.diameter,
+          systemType: args.system_type
+        });
+
+        if (response.success) {
+          return {
+            content: [{
+              type: "text",
+              text: `✅ **Умный трубопровод создан!**\n\n` +
+                    `📏 **Путь:** ${response.route.path.length} сегментов\n` +
+                    `🔧 **Фитинги:** ${response.route.fittings.length} элементов\n` +
+                    `📐 **Длина:** ${response.route.totalLength.toFixed(2)} футов\n` +
+                    `💬 **Сообщение:** ${response.message}`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ **Ошибка создания трубопровода:** ${response.error}`
+            }]
+          };
+        }
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `💥 **Ошибка подключения:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
+          }]
+        };
+      }
+    }
+  );
+
   server.tool(
     "smart_create_duct",
     "Create intelligent ductwork with advanced pathfinding and obstacle avoidance",
@@ -123,62 +173,6 @@ export function registerSmartRevitTools(server: McpServer) {
             content: [{
               type: "text", 
               text: `❌ **Ошибка создания воздуховода:** ${response.error}`
-            }]
-          };
-        }
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `💥 **Ошибка подключения:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
-          }]
-        };
-      }
-    }
-  );
-
-  server.tool(
-    "smart_create_pipe",
-    "Create intelligent piping with optimal routing and system integration",
-    {
-      start_point: z.object({
-        x: z.number(),
-        y: z.number(),
-        z: z.number()
-      }).describe("Starting point coordinates in Revit units"),
-      end_point: z.object({
-        x: z.number(),
-        y: z.number(),
-        z: z.number()
-      }).describe("Ending point coordinates in Revit units"),
-      diameter: z.number().default(0.5).describe("Pipe diameter in feet"),
-      system_type: z.string().optional().describe("Plumbing system type")
-    },
-    async (args) => {
-      try {
-        const response = await revitConnection.sendCommand("smart_create_pipe", {
-          start: args.start_point,
-          end: args.end_point,
-          diameter: args.diameter,
-          systemType: args.system_type
-        });
-
-        if (response.success) {
-          return {
-            content: [{
-              type: "text",
-              text: `✅ **Умный трубопровод создан!**\n\n` +
-                    `📏 **Путь:** ${response.route.path.length} сегментов\n` +
-                    `🔧 **Фитинги:** ${response.route.fittings.length} элементов\n` +
-                    `📐 **Длина:** ${response.route.totalLength.toFixed(2)} футов\n` +
-                    `💬 **Сообщение:** ${response.message}`
-            }]
-          };
-        } else {
-          return {
-            content: [{
-              type: "text",
-              text: `❌ **Ошибка создания трубопровода:** ${response.error}`
             }]
           };
         }
@@ -279,116 +273,4 @@ export function registerSmartRevitTools(server: McpServer) {
                     `📏 **Основной путь:** ${response.routing.optimalPath.length} точек\n` +
                     `🔀 **Альтернативы:** ${response.routing.alternativePaths.length} вариантов\n` +
                     `🛡️ **Зазор:** ${response.routing.clearance} футов\n\n` +
-                    `**Координаты пути:**\n` +
-                                         `${response.routing.optimalPath.slice(0, 5).map((p: any, i: number) => `${i + 1}. (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`).join('\n')}` +
-                    `${response.routing.optimalPath.length > 5 ? `\n... и еще ${response.routing.optimalPath.length - 5} точек` : ''}`
-            }]
-          };
-        } else {
-          return {
-            content: [{
-              type: "text",
-              text: `❌ **Ошибка поиска маршрута:** ${response.error}`
-            }]
-          };
-        }
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `💥 **Ошибка подключения:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
-          }]
-        };
-      }
-    }
-  );
-
-  server.tool(
-    "revit_health_check",
-    "Check connection status and system health with Revit",
-    {},
-    async (args) => {
-      try {
-        const response = await revitConnection.sendCommand("health_check", {});
-        
-        if (response.success) {
-          return {
-            content: [{
-              type: "text",
-              text: `🟢 **Система работает отлично!**\n\n` +
-                    `🔌 **Подключение к Revit:** ✅ Активно\n` +
-                    `📄 **Документ:** ${response.status.documentName}\n` +
-                    `🕐 **Время проверки:** ${new Date(response.status.timestamp).toLocaleString('ru-RU')}\n` +
-                    `📦 **Версия:** ${response.status.version}\n\n` +
-                    `🚀 **Динамические команды:** ${response.status.dynamicCommands?.enabled ? '✅ Включены' : '❌ Отключены'}\n` +
-                    `💾 **Кэшированных команд:** ${response.status.dynamicCommands?.cachedCommands || 0}\n` +
-                    `✅ **Валидных команд:** ${response.status.dynamicCommands?.validCommands || 0}\n\n` +
-                    `🎯 **Готов к выполнению любых команд!**`
-            }]
-          };
-        } else {
-          return {
-            content: [{
-              type: "text",
-              text: `🟡 **Проблемы с подключением**\n\n❌ ${response.error}`
-            }]
-          };
-        }
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `🔴 **Revit недоступен**\n\n` +
-                  `❗ Ошибка: ${error instanceof Error ? error.message : String(error)}\n\n` +
-                  `🔧 **Проверьте:**\n` +
-                  `• Revit запущен\n` +
-                  `• Плагин загружен\n` +
-                  `• MCP сервер запущен\n` +
-                  `• Порт 3001 свободен`
-          }]
-        };
-      }
-    }
-  );
-
-  server.tool(
-    "test_fixed_dynamic_command",
-    "Test the fixed dynamic command system with a simple operation",
-    {
-      operation: z.string().describe("Simple operation to test (e.g., 'create wall', 'analyze space')")
-    },
-    async (args) => {
-      try {
-        const response = await revitConnection.sendCommand("test_fixed_dynamic_command", {
-          operation: args.operation
-        });
-
-        if (response.success) {
-          return {
-            content: [{
-              type: "text",
-              text: `✅ **Тестовая команда выполнена успешно!**\n\n` +
-                    `📝 **Операция:** ${args.operation}\n` +
-                    `🎯 **Результат:** ${response.message}\n\n` +
-                    `🆔 **Элементы:** создано ${response.elementsCreated || 0}, изменено ${response.elementsModified || 0}`
-            }]
-          };
-        } else {
-          return {
-            content: [{
-              type: "text",
-              text: `❌ **Ошибка выполнения тестовой команды:** ${response.error}`
-            }]
-          };
-        }
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `💥 **Критическая ошибка при выполнении тестовой команды:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
-          }]
-        };
-      }
-    }
-  );
-} 
+                    `**Координаты пути:**\n`

@@ -53,12 +53,6 @@ public class Application : ExternalApplication
 
         panel.AddSeparator();
 
-        // Умные команды
-        panel.AddPushButton<SmartCreateDuctCommand>("Smart Duct")
-            .SetImage("/mymcp;component/Resources/Icons/RibbonIcon16.png")
-            .SetLargeImage("/mymcp;component/Resources/Icons/RibbonIcon32.png")
-            .SetToolTip("Создать воздуховод с автоматическим обходом препятствий");
-
         // В будущем добавим больше умных команд
         // panel.AddPushButton<SmartCreatePipeCommand>("Smart Pipe")
         // panel.AddPushButton<SmartCreateElectricalCommand>("Smart Electrical")

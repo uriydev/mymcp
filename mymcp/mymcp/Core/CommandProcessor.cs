@@ -50,7 +50,6 @@ public class CommandProcessor
             return commandName switch
             {
                 // Статические команды (существующие)
-                "smart_create_duct" => ProcessSmartCreateDuct(parameters),
                 "smart_create_pipe" => ProcessSmartCreatePipe(parameters),
                 "analyze_space" => ProcessAnalyzeSpace(parameters),
                 "find_optimal_route" => ProcessFindOptimalRoute(parameters),
@@ -268,56 +267,6 @@ public class CommandProcessor
     }
 
     /// <summary>
-    /// Обрабатывает команду создания умного воздуховода
-    /// </summary>
-    private object ProcessSmartCreateDuct(JObject parameters)
-    {
-        try
-        {
-            var start = ParsePoint(parameters["start"]);
-            var end = ParsePoint(parameters["end"]);
-            var width = parameters["width"]?.Value<double>() ?? 1.0;
-            var height = parameters["height"]?.Value<double>() ?? 0.5;
-
-            if (start == null || end == null)
-            {
-                return new { success = false, error = "Invalid start or end point" };
-            }
-
-            // Находим маршрут
-            var routeResult = _mepPathfinder.FindDuctRoute(start, end, width, height);
-
-            if (!routeResult.Success)
-            {
-                return new { success = false, error = routeResult.Message };
-            }
-
-            // Возвращаем результат для дальнейшего создания в Revit
-            return new
-            {
-                success = true,
-                route = new
-                {
-                    path = routeResult.Path.Select(p => new { x = p.X, y = p.Y, z = p.Z }),
-                    fittings = routeResult.Fittings.Select(f => new
-                    {
-                        position = new { x = f.Position.X, y = f.Position.Y, z = f.Position.Z },
-                        type = f.Type,
-                        size = f.Size
-                    }),
-                    totalLength = routeResult.TotalLength
-                },
-                message = routeResult.Message
-            };
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("Error in smart duct creation", ex);
-            return new { success = false, error = ex.Message };
-        }
-    }
-
-    /// <summary>
     /// Обрабатывает команду создания умного трубопровода
     /// </summary>
     private object ProcessSmartCreatePipe(JObject parameters)
@@ -341,6 +290,7 @@ public class CommandProcessor
                 return new { success = false, error = routeResult.Message };
             }
 
+            // Возвращаем результат для дальнейшего создания в Revit
             return new
             {
                 success = true,

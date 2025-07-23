@@ -18,7 +18,7 @@ public class DynamicCommandManager
     private readonly DynamicCommandCompiler _compiler;
     private readonly CommandTemplateLibrary _templateLibrary;
     private readonly ConcurrentDictionary<string, CompiledCommandCache> _commandCache;
-    private readonly AsyncEventHandler<DynamicCommandResult> _asyncEventHandler;
+    private readonly ActionEventHandler _actionEventHandler;
 
     public DynamicCommandManager()
     {
@@ -26,7 +26,7 @@ public class DynamicCommandManager
         _codeGenerator = new AICodeGenerator(_templateLibrary);
         _compiler = new DynamicCommandCompiler();
         _commandCache = new ConcurrentDictionary<string, CompiledCommandCache>();
-        _asyncEventHandler = new AsyncEventHandler<DynamicCommandResult>();
+        _actionEventHandler = new ActionEventHandler();
     }
 
     /// <summary>
@@ -58,13 +58,13 @@ public class DynamicCommandManager
 
             // 2. Генерируем команду
             Logger.Debug("[DynCmd] Step 1: Generating command code");
-            var generatedCommand = await _codeGenerator.GenerateCommand(naturalLanguageDescription);
+            var generatedCommand = _codeGenerator.GenerateCommand(naturalLanguageDescription).Result;
             Logger.Info($"[DynCmd] Command generated successfully - Template: {generatedCommand.Template.Name}");
 
             // 3. Компилируем команду
             Logger.Debug("[DynCmd] Step 2: Compiling generated command");
-            var compilationResult = await _compiler.CompileCommand(generatedCommand);
-
+            var compilationResult = _compiler.CompileCommand(generatedCommand).Result;
+            
             if (!compilationResult.Success)
             {
                 Logger.Error($"[DynCmd] Compilation failed: {string.Join(", ", compilationResult.Errors)}");
@@ -91,7 +91,7 @@ public class DynamicCommandManager
 
             // 5. Выполняем команду
             Logger.Debug("[DynCmd] Step 4: Executing compiled command");
-            var result = await ExecuteCompiledCommand(compilationResult.CompiledCommand, uiApp, parameters ?? new Dictionary<string, object>());
+            var result = ExecuteCompiledCommand(compilationResult.CompiledCommand, uiApp, parameters ?? new Dictionary<string, object>()).Result;
             
             Logger.Info($"[DynCmd] Dynamic command execution completed - Success: {result.Success}, Time: {result.ExecutionTime.TotalMilliseconds:F0}ms");
             return result;
@@ -122,41 +122,39 @@ public class DynamicCommandManager
             Logger.Info($"[ExecCmd] Executing compiled command: {command.Name}");
             Logger.Debug($"[ExecCmd] Security level: {command.SecurityLevel}");
 
-            // Используем AsyncEventHandler для выполнения команды в UI потоке Revit
-            Logger.Debug("[ExecCmd] Starting command execution via AsyncEventHandler");
-            
-            var result = await _asyncEventHandler.RaiseAsync(application =>
+            // Валидируем параметры
+            var validationResult = command.ValidateParameters(parameters);
+            if (!validationResult.IsValid)
             {
-                Logger.Info($"[ExecCmd] Executing in UI thread: {command.Name}");
-                
-                // Валидируем параметры
-                var validationResult = command.ValidateParameters(parameters);
-                if (!validationResult.IsValid)
+                Logger.Error($"[ExecCmd] Parameter validation failed: {string.Join(", ", validationResult.Errors)}");
+                return new DynamicCommandResult
                 {
-                    Logger.Error($"[ExecCmd] Parameter validation failed: {string.Join(", ", validationResult.Errors)}");
-                    return new DynamicCommandResult
-                    {
-                        Success = false,
-                        Message = $"Parameter validation failed: {string.Join(", ", validationResult.Errors)}",
-                        Warnings = validationResult.Warnings
-                    };
-                }
-                
-                // Выполняем команду
-                return command.Execute(application, parameters);
+                    Success = false,
+                    Message = $"Parameter validation failed: {string.Join(", ", validationResult.Errors)}",
+                    Warnings = validationResult.Warnings
+                };
+            }
+            
+            // Выполняем команду через ActionEventHandler для правильного контекста Revit
+            Logger.Debug("[ExecCmd] Executing command via ActionEventHandler");
+            
+            DynamicCommandResult result = null;
+            
+            _actionEventHandler.Raise(application =>
+            {
+                result = command.Execute(application, parameters);
             });
 
-            Logger.Info($"[ExecCmd] Command executed - Success: {result.Success}, Elements created: {result.ElementsCreated}");
-            if (result.Warnings?.Any() == true)
+            // Ждем завершения
+            await Task.Delay(100); // Небольшая задержка для завершения операции
+            
+            Logger.Info($"[ExecCmd] Command executed - Success: {result?.Success}, Elements created: {result?.ElementsCreated}");
+            
+            return result ?? new DynamicCommandResult
             {
-                Logger.Warning($"[ExecCmd] Command completed with {result.Warnings.Count} warnings");
-                foreach (var warning in result.Warnings)
-                {
-                    Logger.Warning($"[ExecCmd] Warning: {warning}");
-                }
-            }
-
-            return result;
+                Success = false,
+                Message = "Command execution returned null result"
+            };
         }
         catch (Exception ex)
         {
@@ -240,8 +238,8 @@ public class DynamicCommandManager
         {
             try
             {
-                var generated = await _codeGenerator.GenerateCommand(command);
-                var compiled = await _compiler.CompileCommand(generated);
+                var generated = _codeGenerator.GenerateCommand(command).Result;
+                var compiled = _compiler.CompileCommand(generated).Result;
                 
                 if (compiled.Success)
                 {

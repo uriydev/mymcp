@@ -75,10 +75,6 @@ public class CommandTemplateLibrary
 // HVAC System Creation Template
 // This template creates HVAC systems with intelligent routing
 
-var spaceAnalyzer = new SpaceAnalyzer(uiApp);
-var routeCalculator = new RouteCalculator(spaceAnalyzer);
-var mepPathfinder = new MEPPathfinder(spaceAnalyzer, routeCalculator, doc);
-
 using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""))
 {
     transaction.Start();
@@ -140,10 +136,6 @@ catch (Exception ex)
             CodeTemplate = @"
 // Plumbing System Creation Template
 // This template creates plumbing systems with optimal routing
-
-var spaceAnalyzer = new SpaceAnalyzer(uiApp);
-var routeCalculator = new RouteCalculator(spaceAnalyzer);
-var mepPathfinder = new MEPPathfinder(spaceAnalyzer, routeCalculator, doc);
 
 using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""))
 {
@@ -250,19 +242,23 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} Elements
 // System Optimization Template
 // This template optimizes existing MEP systems
 
-var spaceAnalyzer = new SpaceAnalyzer(uiApp);
-var routeCalculator = new RouteCalculator(spaceAnalyzer);
-
-try
+using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""))
 {
-    {{GENERATED_LOGIC}}
+    transaction.Start();
     
-    result.Message = ""System optimization completed successfully"";
-}
-catch (Exception ex)
-{
-    Logger.Error(""Error during system optimization"", ex);
-    throw;
+    try
+    {
+        {{GENERATED_LOGIC}}
+        
+        transaction.Commit();
+        result.ElementsCreated = 1; // Will be updated by specific logic
+        result.Message = ""{{CATEGORY}} system optimized successfully"";
+    }
+    catch (Exception ex)
+    {
+        transaction.RollBack();
+        throw;
+    }
 }"
         });
 

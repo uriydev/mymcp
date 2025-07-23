@@ -22,7 +22,7 @@ public class AICodeGenerator
     /// <summary>
     /// Генерирует команду на основе описания на естественном языке
     /// </summary>
-    public async Task<GeneratedCommand> GenerateCommand(string naturalLanguageRequest)
+    public Task<GeneratedCommand> GenerateCommand(string naturalLanguageRequest)
     {
         try
         {
@@ -61,7 +61,7 @@ public class AICodeGenerator
 
             Logger.Info($"[CodeGen] Command generation completed successfully: {template.Name}");
             Logger.Debug($"[CodeGen] Generated code preview:\n{code.Substring(0, Math.Min(200, code.Length))}...");
-            return generatedCommand;
+            return Task.FromResult(generatedCommand);
         }
         catch (Exception ex)
         {
@@ -88,7 +88,7 @@ public class AICodeGenerator
         Logger.Debug($"[Intent] Lowercase request: {lowerRequest}");
 
         // Определяем основное действие
-        if (lowerRequest.Contains("создай") || lowerRequest.Contains("создать") || lowerRequest.Contains("create"))
+        if (lowerRequest.Contains("создай") || lowerRequest.Contains("создать") || lowerRequest.Contains("create") || lowerRequest.Contains("построить"))
         {
             intent.MainAction = "create";
             intent.RequiredSecurityLevel = SecurityLevel.Moderate;
@@ -223,7 +223,7 @@ public class AICodeGenerator
         code = ReplacePlaceholders(code, intent);
 
         // Генерируем специфическую логику в зависимости от намерения
-        code = GenerateSpecificLogic(code, intent);
+        code = GenerateSpecificLogic(template.CodeTemplate, intent); // Pass template.CodeTemplate here
 
         return code;
     }
@@ -254,6 +254,8 @@ public class AICodeGenerator
     /// </summary>
     private string GenerateSpecificLogic(string template, CommandIntent intent)
     {
+        Logger.Debug($"[CodeGen] Generating specific logic for action: {intent.MainAction}, category: {intent.Category}");
+        
         var logicBuilder = new StringBuilder();
 
         switch (intent.MainAction)
@@ -271,6 +273,7 @@ public class AICodeGenerator
                 logicBuilder.AppendLine(GenerateDeleteLogic(intent));
                 break;
             default:
+                Logger.Warning($"[CodeGen] Using default logic generation for action: {intent.MainAction}");
                 logicBuilder.AppendLine("// Generated logic based on user request");
                 logicBuilder.AppendLine(string.Format("Logger.Info(\"Executing: {0}\");", intent.Description.Replace("\"", "\\\"")));
                 break;
@@ -328,13 +331,12 @@ public class AICodeGenerator
             logic.AppendLine();
             
             logic.AppendLine("// Create the wall");
-            logic.AppendLine("var wall = Wall.Create(doc, wallLine, wallType.Id, level.Id, 10, 0, false, false);");
+            logic.AppendLine("var wall = Wall.Create(doc, wallLine, level.Id, false);");
             logic.AppendLine();
             
             logic.AppendLine("if (wall != null)");
             logic.AppendLine("{");
-            logic.AppendLine("    // Set wall height");
-            logic.AppendLine("    wall.get_Parameter(BuiltInParameter.WALL_USER_HEIGHT_PARAM).Set(10); // 10 feet height");
+            logic.AppendLine("    // Wall created with default height");
             logic.AppendLine("    result.ElementsCreated = 1;");
             logic.AppendLine("    result.Data[\"wall_id\"] = wall.Id.IntegerValue;");
             logic.AppendLine("    result.Message = \"Wall created successfully\";");
@@ -366,11 +368,16 @@ public class AICodeGenerator
                 logic.AppendLine("var endPoint = new XYZ(20, 0, 10);");
             }
             
-            var width = intent.Parameters.ContainsKey("width") ? (double)intent.Parameters["width"] : 1.0;
-            var height = intent.Parameters.ContainsKey("height") ? (double)intent.Parameters["height"] : 0.6;
+            var width = intent.Parameters.ContainsKey("width_ft") ? (double)intent.Parameters["width_ft"] : 1.0;
+            var height = intent.Parameters.ContainsKey("height_ft") ? (double)intent.Parameters["height_ft"] : 0.6;
             
             logic.AppendLine();
-            logic.AppendLine("// First find the optimal route");
+            logic.AppendLine("// Create MEP pathfinder for duct routing");
+            logic.AppendLine("var spaceAnalyzer = new SpaceAnalyzer(uiApp);");
+            logic.AppendLine("var routeCalculator = new RouteCalculator(spaceAnalyzer);");
+            logic.AppendLine("var mepPathfinder = new MEPPathfinder(spaceAnalyzer, routeCalculator, doc);");
+            logic.AppendLine();
+            logic.AppendLine("// Find the optimal route");
             logic.AppendLine(string.Format("var routeResult = mepPathfinder.FindDuctRoute(startPoint, endPoint, {0}, {1});", 
                 width.ToString("F1", System.Globalization.CultureInfo.InvariantCulture), 
                 height.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)));

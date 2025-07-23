@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using mymcp.Core;
+using System.Threading.Tasks;
 
 namespace mymcp.Dynamic;
 
@@ -29,7 +30,8 @@ public class DynamicCommandCompiler
     /// <summary>
     /// Компилирует код команды в исполняемую сборку
     /// </summary>
-    public async Task<CompilationResult> CompileCommand(GeneratedCommand generatedCommand)
+    // public async Task<CompilationResult> CompileCommand(GeneratedCommand generatedCommand)
+    public Task<CompilationResult> CompileCommand(GeneratedCommand generatedCommand)
     {
         try
         {
@@ -42,12 +44,12 @@ public class DynamicCommandCompiler
             if (!securityResult.IsSecure)
             {
                 Logger.Error($"[Compiler] Security validation failed: {string.Join(", ", securityResult.SecurityViolations)}");
-                return new CompilationResult
+                return Task.FromResult(new CompilationResult
                 {
                     Success = false,
                     Errors = securityResult.SecurityViolations,
                     SecurityLevel = generatedCommand.Template.SecurityLevel
-                };
+                });
             }
             Logger.Info("[Compiler] Security validation passed");
 
@@ -97,7 +99,7 @@ public class DynamicCommandCompiler
                     Logger.Error($"[Compiler] Error: {error}");
                 }
 
-                return new CompilationResult
+                return Task.FromResult(new CompilationResult
                 {
                     Success = false,
                     Errors = errors,
@@ -105,7 +107,7 @@ public class DynamicCommandCompiler
                         .Where(d => d.Severity == DiagnosticSeverity.Warning)
                         .Select(d => d.GetMessage())
                         .ToList()
-                };
+                });
             }
 
             Logger.Info("[Compiler] Compilation successful");
@@ -119,33 +121,33 @@ public class DynamicCommandCompiler
             if (commandType == null)
             {
                 Logger.Error("[Compiler] Generated class does not implement IDynamicCommand interface");
-                return new CompilationResult
+                return Task.FromResult(new CompilationResult
                 {
                     Success = false,
                     Errors = new List<string> { "Generated class does not implement IDynamicCommand interface" }
-                };
+                });
             }
 
             var commandInstance = (IDynamicCommand)Activator.CreateInstance(commandType);
             Logger.Info($"[Compiler] Successfully compiled dynamic command: {commandInstance.Name}");
 
-            return new CompilationResult
+            return Task.FromResult(new CompilationResult
             {
                 Success = true,
                 CompiledCommand = commandInstance,
                 Assembly = assembly,
                 GeneratedCode = fullCode,
                 CompilationTime = DateTime.Now
-            };
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"[Compiler] Critical error compiling command '{generatedCommand.Template?.Name ?? "Unknown"}'", ex);
-            return new CompilationResult
+            return Task.FromResult(new CompilationResult
             {
                 Success = false,
                 Errors = new List<string> { ex.Message }
-            };
+            });
         }
     }
 
@@ -211,7 +213,7 @@ public class DynamicCommandCompiler
         sb.AppendLine("            var uiDoc = uiApp.ActiveUIDocument;");
         sb.AppendLine("            ");
         sb.AppendLine("            // Счетчики для отслеживания созданных элементов");
-        sb.AppendLine("            var elementsBeforeCount = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementCount();");
+        sb.AppendLine("            var elementsBeforeCount = new FilteredElementCollector(doc).WhereElementIsNotElementType().ToList().Count;");
         sb.AppendLine();
         
         // Вставляем сгенерированный код
@@ -220,7 +222,7 @@ public class DynamicCommandCompiler
         
         sb.AppendLine();
         sb.AppendLine("            // Подсчитываем созданные элементы");
-        sb.AppendLine("            var elementsAfterCount = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementCount();");
+        sb.AppendLine("            var elementsAfterCount = new FilteredElementCollector(doc).WhereElementIsNotElementType().ToList().Count;");
         sb.AppendLine("            result.ElementsCreated = Math.Max(0, elementsAfterCount - elementsBeforeCount);");
         sb.AppendLine();
         sb.AppendLine("            result.Success = true;");

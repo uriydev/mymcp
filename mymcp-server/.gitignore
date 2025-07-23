@@ -1,0 +1,49 @@
+# Зависимости
+node_modules/
+npm_modules/
+bower_components/
+
+# Файлы сборки и дистрибуции
+dist/
+build/
+out/
+
+# Файлы логов
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Среды и файлы окружения
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Кэш и временные файлы
+.cache/
+.tmp/
+.temp/
+
+# Файлы IDE и редакторов
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
+
+# Typescript
+*.tsbuildinfo
+
+# Файлы покрытия тестов
+coverage/
+.nyc_output/
+
+# Прочее
+.npm
+.eslintcache 

@@ -54,6 +54,8 @@ public class CommandProcessor
                 // Динамические команды
                 "execute_dynamic_command" => ProcessDynamicCommand(parameters),
                 "test_fixed_dynamic_command" => ProcessTestFixedDynamicCommand(parameters),
+                // Очистка кэша команд
+                "clear_command_cache" => ProcessClearCommandCache(parameters),
                 _ => new { success = false, error = $"Unknown command: {commandName}" }
             };
         }
@@ -507,5 +509,57 @@ public class CommandProcessor
             min = new { x = boundingBox.Min.X, y = boundingBox.Min.Y, z = boundingBox.Min.Z },
             max = new { x = boundingBox.Max.X, y = boundingBox.Max.Y, z = boundingBox.Max.Z }
         };
+    }
+
+    /// <summary>
+    /// Обрабатывает команду очистки кэша динамических команд
+    /// </summary>
+    private object ProcessClearCommandCache(JObject parameters)
+    {
+        try
+        {
+            var forceClear = parameters?["force_clear"]?.Value<bool>() ?? false;
+            
+            Logger.Info($"[CmdProc] Processing clear command cache request (force: {forceClear})");
+
+            // Получаем статистику до очистки
+            var statsBefore = _dynamicCommandManager.GetCacheStatistics();
+            
+            // Очищаем кэш
+            _dynamicCommandManager.ClearCommandCache();
+            
+            // Получаем статистику после очистки
+            var statsAfter = _dynamicCommandManager.GetCacheStatistics();
+
+            Logger.Info($"[CmdProc] Command cache cleared successfully. Commands removed: {statsBefore.TotalCachedCommands}");
+
+            return new
+            {
+                success = true,
+                message = "Кэш динамических команд успешно очищен",
+                statistics = new
+                {
+                    before = new
+                    {
+                        totalCommands = statsBefore.TotalCachedCommands,
+                        validCommands = statsBefore.ValidCommands,
+                        oldestCommandAge = statsBefore.OldestCommandAge.TotalMinutes
+                    },
+                    after = new
+                    {
+                        totalCommands = statsAfter.TotalCachedCommands,
+                        validCommands = statsAfter.ValidCommands
+                    },
+                    commandsRemoved = statsBefore.TotalCachedCommands
+                },
+                forceClear = forceClear,
+                timestamp = DateTime.Now
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Error clearing command cache", ex);
+            return new { success = false, error = ex.Message };
+        }
     }
 } 

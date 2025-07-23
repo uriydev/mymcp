@@ -63,12 +63,63 @@ export function registerSmartRevitTools(server: McpServer) {
     }
   );
 
+  // Инструмент для очистки кэша динамических команд
+  server.tool(
+    "clear_command_cache",
+    "🧹 Clear the dynamic command cache to force regeneration of commands with latest code improvements",
+    {
+      force_clear: z.boolean().default(false).describe("Force clear all cached commands")
+    },
+    async (args: { force_clear?: boolean }) => {
+      try {
+        const response = await revitConnection.sendCommand("clear_command_cache", {
+          force_clear: args.force_clear || false
+        });
+
+        if (response.success) {
+          return {
+            content: [{
+              type: "text",
+              text: `✅ **Кэш динамических команд очищен!**\n\n` +
+                    `📊 **Статистика:**\n` +
+                    `• **Удалено команд:** ${response.statistics.commandsRemoved}\n` +
+                    `• **Было валидных:** ${response.statistics.before.validCommands}\n` +
+                    `• **Возраст старейшей команды:** ${response.statistics.before.oldestCommandAge.toFixed(1)} мин\n\n` +
+                    `💾 **После очистки:**\n` +
+                    `• **Команд в кэше:** ${response.statistics.after.totalCommands}\n` +
+                    `• **Валидных команд:** ${response.statistics.after.validCommands}\n\n` +
+                    `⏰ **Время операции:** ${new Date(response.timestamp).toLocaleString('ru-RU')}\n` +
+                    `🔄 **Принудительная очистка:** ${response.forceClear ? 'Да' : 'Нет'}\n\n` +
+                    `✨ **Все новые команды будут перекомпилированы с последними улучшениями!**`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ **Ошибка очистки кэша:** ${response.error}`
+            }]
+          };
+        }
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `💥 **Ошибка подключения:** ${error instanceof Error ? error.message : String(error)}\n\nПроверьте подключение к Revit.`
+          }]
+        };
+      }
+    }
+  );
+
   // Оставляем только инструмент проверки соединения с Revit
   server.tool(
     "revit_health_check",
     "Check connection status and system health with Revit",
-    {},
-    async () => {
+    {
+      random_string: z.string().optional().describe("Dummy parameter for no-parameter tools")
+    },
+    async (args: { random_string?: string }) => {
       try {
         const response = await revitConnection.sendCommand("health_check", {});
         if (response.success) {

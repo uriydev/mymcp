@@ -58,7 +58,7 @@ public class DynamicCommandManager
 
             // 2. Генерируем команду
             Logger.Debug("[DynCmd] Step 1: Generating command code");
-            var generatedCommand = _codeGenerator.GenerateCommand(naturalLanguageDescription).Result;
+            var generatedCommand = _codeGenerator.GenerateCommand(naturalLanguageDescription, parameters).Result;
             Logger.Info($"[DynCmd] Command generated successfully - Template: {generatedCommand.Template.Name}");
 
             // 3. Компилируем команду
@@ -139,14 +139,33 @@ public class DynamicCommandManager
             Logger.Debug("[ExecCmd] Executing command via ActionEventHandler");
             
             DynamicCommandResult result = null;
+            Exception executionException = null;
+            var resetEvent = new System.Threading.ManualResetEvent(false);
             
             _actionEventHandler.Raise(application =>
             {
-                result = command.Execute(application, parameters);
+                try
+                {
+                    result = command.Execute(application, parameters);
+                }
+                catch (Exception ex)
+                {
+                    executionException = ex;
+                }
+                finally
+                {
+                    resetEvent.Set();
+                }
             });
 
-            // Ждем завершения
-            await Task.Delay(100); // Небольшая задержка для завершения операции
+            // Ждем завершения выполнения
+            resetEvent.WaitOne(TimeSpan.FromSeconds(30)); // Таймаут 30 секунд
+            resetEvent.Dispose();
+            
+            if (executionException != null)
+            {
+                throw executionException;
+            }
             
             Logger.Info($"[ExecCmd] Command executed - Success: {result?.Success}, Elements created: {result?.ElementsCreated}");
             

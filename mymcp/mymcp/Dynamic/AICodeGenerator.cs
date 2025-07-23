@@ -24,6 +24,14 @@ public class AICodeGenerator
     /// </summary>
     public Task<GeneratedCommand> GenerateCommand(string naturalLanguageRequest)
     {
+        return GenerateCommand(naturalLanguageRequest, null);
+    }
+
+    /// <summary>
+    /// Генерирует команду на основе описания на естественном языке с внешними параметрами
+    /// </summary>
+    public Task<GeneratedCommand> GenerateCommand(string naturalLanguageRequest, Dictionary<string, object> externalParameters)
+    {
         try
         {
             Logger.Info($"[CodeGen] Starting command generation for: {naturalLanguageRequest}");
@@ -31,6 +39,17 @@ public class AICodeGenerator
             // 1. Анализируем намерение пользователя
             Logger.Debug("[CodeGen] Step 1: Analyzing user intent");
             var intent = AnalyzeIntent(naturalLanguageRequest);
+            
+            // Добавляем внешние параметры, если они переданы
+            if (externalParameters != null)
+            {
+                foreach (var param in externalParameters)
+                {
+                    intent.Parameters[param.Key] = param.Value;
+                }
+                Logger.Debug($"[CodeGen] Added {externalParameters.Count} external parameters");
+            }
+            
             Logger.Info($"[CodeGen] Intent analyzed - Action: {intent.MainAction}, Category: {intent.Category}, Parameters: {intent.Parameters.Count}");
 
             // 2. Находим подходящий шаблон
@@ -88,7 +107,7 @@ public class AICodeGenerator
         Logger.Debug($"[Intent] Lowercase request: {lowerRequest}");
 
         // Определяем основное действие
-        if (lowerRequest.Contains("создай") || lowerRequest.Contains("создать") || lowerRequest.Contains("create") || lowerRequest.Contains("построить"))
+        if (lowerRequest.Contains("создай") || lowerRequest.Contains("создать") || lowerRequest.Contains("create") || lowerRequest.Contains("построить") || lowerRequest.Contains("добавить"))
         {
             intent.MainAction = "create";
             intent.RequiredSecurityLevel = SecurityLevel.Moderate;
@@ -443,7 +462,7 @@ public class AICodeGenerator
         var logic = new StringBuilder();
 
         logic.AppendLine("// Analyze building space");
-        logic.AppendLine("var spaceAnalyzer = new SpaceAnalyzer(uiApp);");
+        logic.AppendLine("var analyzer = new SpaceAnalyzer(uiApp);");
         logic.AppendLine();
 
         if (intent.Parameters.ContainsKey("start_x"))
@@ -465,13 +484,28 @@ public class AICodeGenerator
         logic.AppendLine("    Max = new XYZ(center.X + radius, center.Y + radius, center.Z + radius)");
         logic.AppendLine("};");
         logic.AppendLine();
-        logic.AppendLine("var elements = spaceAnalyzer.GetElementsInBoundingBox(boundingBox);");
-        logic.AppendLine("var isSpaceAvailable = spaceAnalyzer.IsSpaceAvailable(center, radius * 0.5);");
+        logic.AppendLine("var elements = analyzer.GetElementsInBoundingBox(boundingBox);");
+        logic.AppendLine("var isSpaceAvailable = analyzer.IsSpaceAvailable(center, radius * 0.5);");
         logic.AppendLine();
-        logic.AppendLine("result.Data[\"elements_found\"] = elements.Count;");
+        
+        // Добавляем подсчет стен, комнат и других элементов
+        logic.AppendLine("// Count specific element types");
+        logic.AppendLine("var walls = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsNotElementType().ToList();");
+        logic.AppendLine("var rooms = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType().ToList();");
+        logic.AppendLine("var doors = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors).WhereElementIsNotElementType().ToList();");
+        logic.AppendLine("var windows = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows).WhereElementIsNotElementType().ToList();");
+        logic.AppendLine("var ducts = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_DuctCurves).WhereElementIsNotElementType().ToList();");
+        logic.AppendLine();
+        
+        logic.AppendLine("result.Data[\"total_elements\"] = elements.Count;");
+        logic.AppendLine("result.Data[\"walls_count\"] = walls.Count;");
+        logic.AppendLine("result.Data[\"rooms_count\"] = rooms.Count;");
+        logic.AppendLine("result.Data[\"doors_count\"] = doors.Count;");
+        logic.AppendLine("result.Data[\"windows_count\"] = windows.Count;");
+        logic.AppendLine("result.Data[\"ducts_count\"] = ducts.Count;");
         logic.AppendLine("result.Data[\"space_available\"] = isSpaceAvailable;");
         logic.AppendLine("result.Data[\"analysis_center\"] = string.Format(\"({0:F1}, {1:F1}, {2:F1})\", center.X, center.Y, center.Z);");
-        logic.AppendLine("result.Message = string.Format(\"Analysis completed: {0} elements found, space available: {1}\", elements.Count, isSpaceAvailable);");
+        logic.AppendLine("result.Message = string.Format(\"Analysis: {0} walls, {1} rooms, {2} doors, {3} windows, {4} ducts. Total: {5} elements\", walls.Count, rooms.Count, doors.Count, windows.Count, ducts.Count, elements.Count);");
 
         return logic.ToString();
     }
@@ -484,8 +518,8 @@ public class AICodeGenerator
         var logic = new StringBuilder();
 
         logic.AppendLine("// Optimize existing systems");
-        logic.AppendLine("var spaceAnalyzer = new SpaceAnalyzer(uiApp);");
-        logic.AppendLine("var routeCalculator = new RouteCalculator(spaceAnalyzer);");
+        logic.AppendLine("var optimizer = new SpaceAnalyzer(uiApp);");
+        logic.AppendLine("var routeCalculator = new RouteCalculator(optimizer);");
         logic.AppendLine();
         logic.AppendLine("// Find existing MEP elements");
         logic.AppendLine("var mepElements = new FilteredElementCollector(doc)");

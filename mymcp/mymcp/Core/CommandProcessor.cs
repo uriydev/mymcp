@@ -53,7 +53,6 @@ public class CommandProcessor
                 "health_check" => ProcessHealthCheck(),
                 // Динамические команды
                 "execute_dynamic_command" => ProcessDynamicCommand(parameters),
-                "test_fixed_dynamic_command" => ProcessTestFixedDynamicCommand(parameters),
                 // Очистка кэша команд
                 "clear_command_cache" => ProcessClearCommandCache(parameters),
                 _ => new { success = false, error = $"Unknown command: {commandName}" }
@@ -148,68 +147,7 @@ public class CommandProcessor
         }
     }
 
-    /// <summary>
-    /// Обрабатывает тестовую динамическую команду
-    /// </summary>
-    private object ProcessTestFixedDynamicCommand(JObject parameters)
-    {
-        try
-        {
-            var operation = parameters["operation"]?.ToString() ?? "create wall";
-            
-            Logger.Info($"Testing fixed dynamic command with operation: {operation}");
 
-            // Создаем простую тестовую команду для проверки системы
-            var testDescription = $"Создай простую тестовую операцию: {operation}. Используй безопасную транзакцию и выведи сообщение о результате.";
-
-            var commandParameters = new Dictionary<string, object>
-            {
-                ["operation"] = operation,
-                ["complexity_level"] = "simple",
-                ["safety_mode"] = true,
-                ["optimization_level"] = "speed"
-            };
-
-            // Выполняем тестовую динамическую команду
-            var task = _dynamicCommandManager.ExecuteCommand(testDescription, _uiApp, commandParameters);
-            var result = task.GetAwaiter().GetResult();
-
-            if (result.Success)
-            {
-                return new
-                {
-                    success = true,
-                    message = $"✅ Test operation '{operation}' completed successfully",
-                    data = result.Data,
-                    executionTime = result.ExecutionTime.TotalMilliseconds,
-                    elementsCreated = result.ElementsCreated,
-                    elementsModified = result.ElementsModified,
-                    warnings = result.Warnings,
-                    testResult = "Dynamic command system is working correctly"
-                };
-            }
-            else
-            {
-                return new
-                {
-                    success = false,
-                    error = result.Message,
-                    executionTime = result.ExecutionTime.TotalMilliseconds,
-                    warnings = result.Warnings,
-                    testResult = "Dynamic command system has issues"
-                };
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("Error in test fixed dynamic command", ex);
-            return new { 
-                success = false, 
-                error = ex.Message,
-                testResult = "Critical error in dynamic command system"
-            };
-        }
-    }
 
     /// <summary>
     /// Генерирует детали выполнения команды

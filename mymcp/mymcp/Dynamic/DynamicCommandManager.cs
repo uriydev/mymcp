@@ -23,7 +23,7 @@ public class DynamicCommandManager
     public DynamicCommandManager()
     {
         _templateLibrary = new CommandTemplateLibrary();
-        _codeGenerator = new AICodeGenerator(_templateLibrary);
+        _codeGenerator = new AICodeGenerator();
         _compiler = new DynamicCommandCompiler();
         _commandCache = new ConcurrentDictionary<string, CompiledCommandCache>();
         _actionEventHandler = new ActionEventHandler();

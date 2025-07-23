@@ -54,6 +54,8 @@ public class CommandProcessor
                 // Динамические команды
                 "execute_dynamic_command" => ProcessDynamicCommand(parameters),
                 "test_fixed_dynamic_command" => ProcessTestFixedDynamicCommand(parameters),
+                // Очистка кэша команд
+                "clear_command_cache" => ProcessClearCommandCache(parameters),
                 _ => new { success = false, error = $"Unknown command: {commandName}" }
             };
         }
@@ -116,6 +118,7 @@ public class CommandProcessor
                 return new
                 {
                     success = true,
+                    result = result.Message, // Добавляем поле result для MCP клиента
                     message = result.Message,
                     data = result.Data,
                     executionTime = result.ExecutionTime.TotalMilliseconds,
@@ -507,5 +510,55 @@ public class CommandProcessor
             min = new { x = boundingBox.Min.X, y = boundingBox.Min.Y, z = boundingBox.Min.Z },
             max = new { x = boundingBox.Max.X, y = boundingBox.Max.Y, z = boundingBox.Max.Z }
         };
+    }
+
+    /// <summary>
+    /// Обрабатывает команду очистки кэша динамических команд
+    /// </summary>
+    private object ProcessClearCommandCache(JObject parameters)
+    {
+        try
+        {
+            var forceClean = parameters?["force"]?.Value<bool>() ?? false;
+            
+            Logger.Info($"[CmdProc] Processing clear command cache (force: {forceClean})");
+            
+            // Получаем статистику до очистки
+            var statsBeforeClear = _dynamicCommandManager.GetCacheStatistics();
+            
+            // Очищаем кэш
+            _dynamicCommandManager.ClearCommandCache();
+            
+            // Получаем статистику после очистки
+            var statsAfterClear = _dynamicCommandManager.GetCacheStatistics();
+            
+            var result = new
+            {
+                success = true,
+                result = "Command cache cleared successfully",
+                message = $"Cleared {statsBeforeClear.TotalCachedCommands} cached commands. Cache is now empty.",
+                data = new
+                {
+                    commands_cleared = statsBeforeClear.TotalCachedCommands,
+                    valid_commands_cleared = statsBeforeClear.ValidCommands,
+                    cache_size_after = statsAfterClear.TotalCachedCommands,
+                    force_mode = forceClean
+                },
+                executionTime = 0 // Мгновенная операция
+            };
+            
+            Logger.Info($"[CmdProc] Cache cleared successfully - {statsBeforeClear.TotalCachedCommands} commands removed");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("[CmdProc] Error clearing command cache", ex);
+            return new
+            {
+                success = false,
+                error = ex.Message,
+                message = "Failed to clear command cache"
+            };
+        }
     }
 } 

@@ -5,7 +5,7 @@ using System.Linq;
 namespace mymcp.Dynamic;
 
 /// <summary>
-/// Шаблон для генерации динамических команд
+/// Шаблон команды для генерации динамических команд
 /// </summary>
 public class CommandTemplate
 {
@@ -14,38 +14,38 @@ public class CommandTemplate
     public string Description { get; set; }
     public string Category { get; set; }
     public SecurityLevel SecurityLevel { get; set; }
-    public string CodeTemplate { get; set; }
-    public List<TemplateParameter> Parameters { get; set; } = new();
-    public List<string> RequiredNamespaces { get; set; } = new();
-    public List<string> Tags { get; set; } = new();
-    public string CreatedBy { get; set; }
-    public DateTime CreatedDate { get; set; }
-
+    public List<string> Tags { get; set; } = new List<string>();
+    public List<string> RequiredNamespaces { get; set; } = new List<string>();
+    public string Code { get; set; }
+    
     /// <summary>
-    /// Проверяет, подходит ли шаблон для данного намерения
+    /// Вычисляет совпадение с намерением команды
     /// </summary>
-    public double CalculateMatchScore(CommandIntent intent)
+    public double CalculateMatch(CommandIntent intent)
     {
         double score = 0;
 
-        // Проверяем совпадение по тегам
-        var commonTags = Tags.Intersect(intent.Tags, StringComparer.OrdinalIgnoreCase).Count();
-        score += commonTags * 0.3;
-
-        // Проверяем совпадение по категории
-        if (string.Equals(Category, intent.Category, StringComparison.OrdinalIgnoreCase))
+        // Проверяем категорию
+        if (Category?.Equals(intent.Category, StringComparison.OrdinalIgnoreCase) == true)
         {
-            score += 0.4;
+            score += 0.5;
         }
 
-        // Проверяем совпадение по описанию (простой текстовый анализ)
-        var descriptionWords = Description.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var intentWords = intent.Description.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var commonWords = descriptionWords.Intersect(intentWords, StringComparer.OrdinalIgnoreCase).Count();
-        
-        if (descriptionWords.Length > 0)
+        // Проверяем теги
+        if (Tags != null && Tags.Count > 0)
         {
-            score += (double)commonWords / descriptionWords.Length * 0.3;
+            var matchingTags = Tags.Count(tag => 
+                intent.Description.Contains(tag, StringComparison.OrdinalIgnoreCase));
+            score += (double)matchingTags / Tags.Count * 0.3;
+        }
+
+        // Проверяем действие
+        if (Tags != null && !string.IsNullOrEmpty(intent.MainAction))
+        {
+            if (Tags.Contains(intent.MainAction, StringComparer.OrdinalIgnoreCase))
+            {
+                score += 0.2;
+            }
         }
 
         return Math.Min(score, 1.0);

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using mymcp.Core;
+using System.IO;
 
 namespace mymcp.Dynamic;
 
@@ -13,10 +15,21 @@ namespace mymcp.Dynamic;
 public class AICodeGenerator
 {
     private readonly CommandTemplateLibrary _templateLibrary;
+    private readonly ApiDocumentationProvider _apiDocumentation;
 
-    public AICodeGenerator(CommandTemplateLibrary templateLibrary)
+    public AICodeGenerator()
     {
-        _templateLibrary = templateLibrary;
+        _templateLibrary = new CommandTemplateLibrary();
+        
+        // Инициализируем провайдер документации API
+        // Путь к файлу документации в папке проекта
+        var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+        var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
+        var documentationPath = Path.Combine(assemblyDirectory, "Files", "2022.chm");
+        _apiDocumentation = new ApiDocumentationProvider(documentationPath);
+        
+        // Загружаем документацию асинхронно
+        Task.Run(async () => await _apiDocumentation.LoadDocumentation());
     }
 
     /// <summary>
@@ -113,7 +126,9 @@ public class AICodeGenerator
             intent.RequiredSecurityLevel = SecurityLevel.Moderate;
             Logger.Debug("[Intent] Main action detected: CREATE");
         }
-        else if (lowerRequest.Contains("анализ") || lowerRequest.Contains("проанализ") || lowerRequest.Contains("analyze"))
+        else if (lowerRequest.Contains("анализ") || lowerRequest.Contains("проанализ") || lowerRequest.Contains("analyze") || 
+                 lowerRequest.Contains("найди") || lowerRequest.Contains("найти") || lowerRequest.Contains("покажи") || 
+                 lowerRequest.Contains("показать") || lowerRequest.Contains("find") || lowerRequest.Contains("show"))
         {
             intent.MainAction = "analyze";
             intent.RequiredSecurityLevel = SecurityLevel.Safe;
@@ -236,13 +251,36 @@ public class AICodeGenerator
     /// </summary>
     private string GenerateCodeFromTemplate(CommandTemplate template, CommandIntent intent)
     {
-        var code = template.CodeTemplate;
+        var code = template.Code;
 
-        // Заменяем плейсхолдеры на конкретные значения
-        code = ReplacePlaceholders(code, intent);
+        // Добавляем API рекомендации если доступны
+        Logger.Debug($"[CodeGen] API Documentation available: {_apiDocumentation.IsAvailable}");
+        if (_apiDocumentation.IsAvailable)
+        {
+            var apiRecommendations = _apiDocumentation.GetRecommendationsForCategory(intent.Category);
+            Logger.Debug($"[CodeGen] API recommendations for {intent.Category}: {!string.IsNullOrEmpty(apiRecommendations)}");
+            if (!string.IsNullOrEmpty(apiRecommendations))
+            {
+                // Вставляем рекомендации в начало логики
+                var logicPlaceholder = "{{GENERATED_LOGIC}}";
+                var enhancedLogic = apiRecommendations + Environment.NewLine + GenerateSpecificLogic(template, intent);
+                code = code.Replace(logicPlaceholder, enhancedLogic);
+                Logger.Info($"[CodeGen] Enhanced code with API recommendations for {intent.Category}");
+            }
+            else
+            {
+                code = code.Replace("{{GENERATED_LOGIC}}", GenerateSpecificLogic(template, intent));
+            }
+        }
+        else
+        {
+            code = code.Replace("{{GENERATED_LOGIC}}", GenerateSpecificLogic(template, intent));
+        }
 
-        // Генерируем специфическую логику в зависимости от намерения
-        code = GenerateSpecificLogic(template.CodeTemplate, intent); // Pass template.CodeTemplate here
+        // Заменяем остальные плейсхолдеры
+        code = code.Replace("{{ACTION}}", intent.MainAction ?? "Execute");
+        code = code.Replace("{{CATEGORY}}", intent.Category ?? "General");
+        code = code.Replace("{{DESCRIPTION}}", intent.Description ?? "Dynamic command");
 
         return code;
     }
@@ -271,7 +309,7 @@ public class AICodeGenerator
     /// <summary>
     /// Генерирует специфическую логику на основе намерения
     /// </summary>
-    private string GenerateSpecificLogic(string template, CommandIntent intent)
+    private string GenerateSpecificLogic(CommandTemplate template, CommandIntent intent)
     {
         Logger.Debug($"[CodeGen] Generating specific logic for action: {intent.MainAction}, category: {intent.Category}");
         
@@ -298,7 +336,7 @@ public class AICodeGenerator
                 break;
         }
 
-        return template.Replace("{{GENERATED_LOGIC}}", logicBuilder.ToString());
+        return logicBuilder.ToString();
     }
 
     /// <summary>
@@ -308,69 +346,94 @@ public class AICodeGenerator
     {
         var logic = new StringBuilder();
 
-        if (intent.Category == "Architecture" || intent.Description.ToLower().Contains("стен"))
-        {
-            logic.AppendLine("// Create wall using Revit API");
-            logic.AppendLine();
-            
-            logic.AppendLine("// Find level and wall type");
-            logic.AppendLine("var level = new FilteredElementCollector(doc)");
-            logic.AppendLine("    .OfClass(typeof(Level))");
-            logic.AppendLine("    .FirstElement() as Level;");
-            logic.AppendLine();
-            
-            logic.AppendLine("var wallType = new FilteredElementCollector(doc)");
-            logic.AppendLine("    .OfClass(typeof(WallType))");
-            logic.AppendLine("    .Cast<WallType>()");
-            logic.AppendLine("    .FirstOrDefault(wt => wt.Kind == WallKind.Basic);");
-            logic.AppendLine();
-            
-            logic.AppendLine("if (level == null || wallType == null)");
-            logic.AppendLine("{");
-            logic.AppendLine("    throw new InvalidOperationException(\"Could not find level or wall type\");");
-            logic.AppendLine("}");
-            logic.AppendLine();
-
-            // Определяем координаты стены
-            if (intent.Parameters.ContainsKey("start_x"))
-            {
-                logic.AppendLine(string.Format("var startPoint = new XYZ({0}, {1}, {2});", 
-                    intent.Parameters["start_x"], intent.Parameters["start_y"], intent.Parameters["start_z"]));
-                logic.AppendLine(string.Format("var endPoint = new XYZ({0}, {1}, {2});", 
-                    intent.Parameters["end_x"], intent.Parameters["end_y"], intent.Parameters["end_z"]));
-            }
-            else
-            {
-                // Значения по умолчанию
-                logic.AppendLine("var startPoint = new XYZ(0, 0, 0);");
-                logic.AppendLine("var endPoint = new XYZ(10, 0, 0);");
-            }
-            
-            logic.AppendLine("var wallLine = Line.CreateBound(startPoint, endPoint);");
-            logic.AppendLine();
-            
-            logic.AppendLine("// Create the wall");
-            logic.AppendLine("var wall = Wall.Create(doc, wallLine, level.Id, false);");
-            logic.AppendLine();
-            
-            logic.AppendLine("if (wall != null)");
-            logic.AppendLine("{");
-            logic.AppendLine("    // Wall created with default height");
-            logic.AppendLine("    result.ElementsCreated = 1;");
-            logic.AppendLine("    result.Data[\"wall_id\"] = wall.Id.IntegerValue;");
-            logic.AppendLine("    result.Message = \"Wall created successfully\";");
-            logic.AppendLine("    Logger.Info($\"Created wall with ID: {wall.Id}\");");
-            logic.AppendLine("}");
-            logic.AppendLine("else");
-            logic.AppendLine("{");
-            logic.AppendLine("    throw new InvalidOperationException(\"Failed to create wall\");");
-            logic.AppendLine("}");
-        }
-        else if (intent.Category == "HVAC" || intent.Description.ToLower().Contains("воздуховод"))
+        if (intent.Category == "HVAC" || intent.Description.ToLower().Contains("воздуховод"))
         {
             logic.AppendLine("// Create duct using MEP pathfinder and actual Revit elements");
             logic.AppendLine("Logger.Info(\"Creating real duct elements in Revit\");");
             logic.AppendLine();
+
+            // Проверяем, нужно ли анализировать стены
+            bool followWalls = intent.Description.ToLower().Contains("стен") || 
+                             intent.Description.ToLower().Contains("вдоль") ||
+                             intent.Description.ToLower().Contains("wall");
+
+            if (followWalls)
+            {
+                logic.AppendLine("// Analyze walls and create ducts along them");
+                logic.AppendLine("Logger.Info(\"Analyzing walls in current view\");");
+                logic.AppendLine();
+                logic.AppendLine("// Get all walls from current view or document");
+                logic.AppendLine("var walls = new FilteredElementCollector(doc)");
+                logic.AppendLine("    .OfClass(typeof(Wall))");
+                logic.AppendLine("    .Cast<Wall>()");
+                logic.AppendLine("    .Where(w => w.Location is LocationCurve)");
+                logic.AppendLine("    .ToList();");
+                logic.AppendLine();
+                logic.AppendLine("Logger.Info($\"Found {walls.Count} walls to process\");");
+                logic.AppendLine();
+                logic.AppendLine("// Set duct height offset (3 meters = ~10 feet)");
+                logic.AppendLine("double heightOffset = 10.0; // feet");
+                
+                // Передаем параметр высоты если он есть
+                if (intent.Parameters.ContainsKey("height"))
+                {
+                    var heightValue = intent.Parameters["height"];
+                    logic.AppendLine($"double heightMm = {heightValue};");
+                    logic.AppendLine("heightOffset = heightMm * 0.00328084; // Convert mm to feet");
+                }
+                else
+                {
+                    logic.AppendLine("// Using default height offset");
+                }
+                logic.AppendLine();
+                logic.AppendLine("var createdDucts = 0;");
+                logic.AppendLine("var spaceAnalyzer = new SpaceAnalyzer(uiApp);");
+                logic.AppendLine("var routeCalculator = new RouteCalculator(spaceAnalyzer);");
+                logic.AppendLine("var mepPathfinder = new MEPPathfinder(spaceAnalyzer, routeCalculator, doc);");
+                logic.AppendLine();
+                logic.AppendLine("foreach (var wall in walls)");
+                logic.AppendLine("{");
+                logic.AppendLine("    try");
+                logic.AppendLine("    {");
+                logic.AppendLine("        var locationCurve = wall.Location as LocationCurve;");
+                logic.AppendLine("        var curve = locationCurve.Curve;");
+                logic.AppendLine("        ");
+                logic.AppendLine("        // Get wall endpoints and offset vertically");
+                logic.AppendLine("        var startPoint = curve.GetEndPoint(0);");
+                logic.AppendLine("        var endPoint = curve.GetEndPoint(1);");
+                logic.AppendLine("        ");
+                logic.AppendLine("        // Offset points vertically for duct height");
+                logic.AppendLine("        startPoint = new XYZ(startPoint.X, startPoint.Y, startPoint.Z + heightOffset);");
+                logic.AppendLine("        endPoint = new XYZ(endPoint.X, endPoint.Y, endPoint.Z + heightOffset);");
+                logic.AppendLine("        ");
+                logic.AppendLine("        Logger.Info($\"Creating duct along wall from ({startPoint.X:F2}, {startPoint.Y:F2}, {startPoint.Z:F2}) to ({endPoint.X:F2}, {endPoint.Y:F2}, {endPoint.Z:F2})\");");
+                logic.AppendLine("        ");
+                logic.AppendLine("        // Find route and create duct");
+                logic.AppendLine("        var routeResult = mepPathfinder.FindDuctRoute(startPoint, endPoint, 1.0, 0.6);");
+                logic.AppendLine("        ");
+                logic.AppendLine("        if (routeResult.Success)");
+                logic.AppendLine("        {");
+                logic.AppendLine("            var smartResult = mepPathfinder.CreateSmartDuct(startPoint, endPoint, routeResult);");
+                logic.AppendLine("            if (smartResult.Success)");
+                logic.AppendLine("            {");
+                logic.AppendLine("                createdDucts += smartResult.ElementsCreated;");
+                logic.AppendLine("                Logger.Info($\"Successfully created duct along wall: {smartResult.ElementsCreated} elements\");");
+                logic.AppendLine("            }");
+                logic.AppendLine("        }");
+                logic.AppendLine("    }");
+                logic.AppendLine("    catch (Exception ex)");
+                logic.AppendLine("    {");
+                logic.AppendLine("        Logger.Warning($\"Failed to create duct along wall: {ex.Message}\");");
+                logic.AppendLine("    }");
+                logic.AppendLine("}");
+                logic.AppendLine();
+                logic.AppendLine("result.ElementsCreated = createdDucts;");
+                logic.AppendLine("result.Message = $\"Created {createdDucts} duct elements along {walls.Count} walls\";");
+                logic.AppendLine("Logger.Info($\"Completed wall analysis: {createdDucts} ducts created along {walls.Count} walls\");");
+            }
+            else
+            {
+                // Оригинальная логика для точечного создания воздуховодов
 
             // Определяем координаты воздуховода
             if (intent.Parameters.ContainsKey("start_x"))
@@ -437,6 +500,65 @@ public class AICodeGenerator
             logic.AppendLine("{");
             logic.AppendLine("    throw new InvalidOperationException($\"Failed to find duct route: {routeResult.Message}\");");
             logic.AppendLine("}");
+            }
+        }
+        else if (intent.Category == "Architecture" || intent.Description.ToLower().Contains("стен"))
+        {
+            logic.AppendLine("// Create wall using Revit API");
+            logic.AppendLine();
+            
+            logic.AppendLine("// Find level and wall type");
+            logic.AppendLine("var level = new FilteredElementCollector(doc)");
+            logic.AppendLine("    .OfClass(typeof(Level))");
+            logic.AppendLine("    .FirstElement() as Level;");
+            logic.AppendLine();
+            
+            logic.AppendLine("var wallType = new FilteredElementCollector(doc)");
+            logic.AppendLine("    .OfClass(typeof(WallType))");
+            logic.AppendLine("    .Cast<WallType>()");
+            logic.AppendLine("    .FirstOrDefault(wt => wt.Kind == WallKind.Basic);");
+            logic.AppendLine();
+            
+            logic.AppendLine("if (level == null || wallType == null)");
+            logic.AppendLine("{");
+            logic.AppendLine("    throw new InvalidOperationException(\"Could not find level or wall type\");");
+            logic.AppendLine("}");
+            logic.AppendLine();
+
+            // Определяем координаты стены
+            if (intent.Parameters.ContainsKey("start_x"))
+            {
+                logic.AppendLine(string.Format("var startPoint = new XYZ({0}, {1}, {2});", 
+                    intent.Parameters["start_x"], intent.Parameters["start_y"], intent.Parameters["start_z"]));
+                logic.AppendLine(string.Format("var endPoint = new XYZ({0}, {1}, {2});", 
+                    intent.Parameters["end_x"], intent.Parameters["end_y"], intent.Parameters["end_z"]));
+            }
+            else
+            {
+                // Значения по умолчанию
+                logic.AppendLine("var startPoint = new XYZ(0, 0, 0);");
+                logic.AppendLine("var endPoint = new XYZ(10, 0, 0);");
+            }
+            
+            logic.AppendLine("var wallLine = Line.CreateBound(startPoint, endPoint);");
+            logic.AppendLine();
+            
+            logic.AppendLine("// Create the wall");
+            logic.AppendLine("var wall = Wall.Create(doc, wallLine, level.Id, false);");
+            logic.AppendLine();
+            
+            logic.AppendLine("if (wall != null)");
+            logic.AppendLine("{");
+            logic.AppendLine("    // Wall created with default height");
+            logic.AppendLine("    result.ElementsCreated = 1;");
+            logic.AppendLine("    result.Data[\"wall_id\"] = wall.Id.IntegerValue;");
+            logic.AppendLine("    result.Message = \"Wall created successfully\";");
+            logic.AppendLine("    Logger.Info($\"Created wall with ID: {wall.Id}\");");
+            logic.AppendLine("}");
+            logic.AppendLine("else");
+            logic.AppendLine("{");
+            logic.AppendLine("    throw new InvalidOperationException(\"Failed to create wall\");");
+            logic.AppendLine("}");
         }
         else if (intent.Category == "Plumbing")
         {
@@ -496,6 +618,40 @@ public class AICodeGenerator
         logic.AppendLine("var windows = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows).WhereElementIsNotElementType().ToList();");
         logic.AppendLine("var ducts = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_DuctCurves).WhereElementIsNotElementType().ToList();");
         logic.AppendLine();
+        
+        // Добавляем извлечение координат стен и параметров если запрошено
+        if (intent.Parameters.ContainsKey("extract_wall_coordinates") || 
+            intent.Parameters.ContainsKey("detailed_geometry") ||
+            intent.Description.ToLower().Contains("координат") ||
+            intent.Description.ToLower().Contains("параметр") ||
+            intent.Description.ToLower().Contains("высот"))
+        {
+            logic.AppendLine("// Extract wall coordinates and parameters");
+            logic.AppendLine("var wallDetails = new List<string>();");
+            logic.AppendLine("foreach (Wall wall in walls)");
+            logic.AppendLine("{");
+            logic.AppendLine("    var locationCurve = wall.Location as LocationCurve;");
+            logic.AppendLine("    if (locationCurve != null)");
+            logic.AppendLine("    {");
+            logic.AppendLine("        var startPoint = locationCurve.Curve.GetEndPoint(0);");
+            logic.AppendLine("        var endPoint = locationCurve.Curve.GetEndPoint(1);");
+            logic.AppendLine("        ");
+            logic.AppendLine("        // Get wall height parameter");
+            logic.AppendLine("        var heightParam = wall.get_Parameter(BuiltInParameter.WALL_USER_HEIGHT_PARAM);");
+            logic.AppendLine("        var height = heightParam != null ? heightParam.AsDouble() : 0.0;");
+            logic.AppendLine("        ");
+            logic.AppendLine("        // Get wall type");
+            logic.AppendLine("        var wallTypeName = wall.WallType != null ? wall.WallType.Name : \"Unknown\";");
+            logic.AppendLine("        ");
+            logic.AppendLine("        var detailString = string.Format(\"Wall {0} ({1}): Height={2:F1}ft, From=({3:F1},{4:F1},{5:F1}) To=({6:F1},{7:F1},{8:F1})\",");
+            logic.AppendLine("            wall.Id.IntegerValue, wallTypeName, height, startPoint.X, startPoint.Y, startPoint.Z, endPoint.X, endPoint.Y, endPoint.Z);");
+            logic.AppendLine("        wallDetails.Add(detailString);");
+            logic.AppendLine("        Logger.Info(detailString);");
+            logic.AppendLine("    }");
+            logic.AppendLine("}");
+            logic.AppendLine("result.Data[\"wall_details\"] = string.Join(\"; \", wallDetails);");
+            logic.AppendLine();
+        }
         
         logic.AppendLine("result.Data[\"total_elements\"] = elements.Count;");
         logic.AppendLine("result.Data[\"walls_count\"] = walls.Count;");

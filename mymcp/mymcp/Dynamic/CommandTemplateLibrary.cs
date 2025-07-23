@@ -24,7 +24,7 @@ public class CommandTemplateLibrary
     public CommandTemplate FindBestMatch(CommandIntent intent)
     {
         var bestTemplate = _templates.Values
-            .Select(template => new { Template = template, Score = template.CalculateMatchScore(intent) })
+            .Select(template => new { Template = template, Score = template.CalculateMatch(intent) })
             .Where(x => x.Score > 0.1) // Минимальный порог совпадения
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();
@@ -66,14 +66,14 @@ public class CommandTemplateLibrary
         {
             Id = "hvac_create",
             Name = "Create HVAC System",
-            Description = "Create HVAC systems including ducts, equipment and routing",
+            Description = "Create HVAC systems including ducts, equipment and routing with Revit API best practices",
             Category = "HVAC",
             SecurityLevel = SecurityLevel.Moderate,
             Tags = new List<string> { "hvac", "duct", "create", "mechanical", "airflow" },
             RequiredNamespaces = new List<string> { "Autodesk.Revit.DB.Mechanical" },
-            CodeTemplate = @"
-// HVAC System Creation Template
-// This template creates HVAC systems with intelligent routing
+            Code = @"
+// HVAC System Creation Template with API Best Practices
+// This template creates HVAC systems using recommended Revit API patterns
 
 using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""))
 {
@@ -104,7 +104,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""
             Category = "Analysis",
             SecurityLevel = SecurityLevel.Safe,
             Tags = new List<string> { "analyze", "space", "optimization", "placement" },
-            CodeTemplate = @"
+            Code = @"
 // Space Analysis Template
 // This template analyzes building space and provides recommendations
 
@@ -133,7 +133,7 @@ catch (Exception ex)
             SecurityLevel = SecurityLevel.Moderate,
             Tags = new List<string> { "plumbing", "pipe", "create", "water", "mechanical" },
             RequiredNamespaces = new List<string> { "Autodesk.Revit.DB.Plumbing" },
-            CodeTemplate = @"
+            Code = @"
 // Plumbing System Creation Template
 // This template creates plumbing systems with optimal routing
 
@@ -167,7 +167,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""
             SecurityLevel = SecurityLevel.Moderate,
             Tags = new List<string> { "electrical", "cable", "create", "power", "lighting" },
             RequiredNamespaces = new List<string> { "Autodesk.Revit.DB.Electrical" },
-            CodeTemplate = @"
+            Code = @"
 // Electrical System Creation Template
 // This template creates electrical systems with cable routing
 
@@ -203,7 +203,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""
             Category = "Architecture",
             SecurityLevel = SecurityLevel.Moderate,
             Tags = new List<string> { "architecture", "wall", "floor", "roof", "create", "structural" },
-            CodeTemplate = @"
+            Code = @"
 // Architectural Elements Creation Template
 // This template creates architectural elements
 
@@ -238,7 +238,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} Elements
             Category = "Optimization",
             SecurityLevel = SecurityLevel.High,
             Tags = new List<string> { "optimize", "performance", "efficiency", "analysis" },
-            CodeTemplate = @"
+            Code = @"
 // System Optimization Template
 // This template optimizes existing MEP systems
 
@@ -277,7 +277,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} {{CATEGORY}} System""
                 "Autodesk.Revit.DB.Plumbing", 
                 "Autodesk.Revit.DB.Electrical" 
             },
-            CodeTemplate = @"
+            Code = @"
 // Complex Multi-System Template
 // This template handles complex projects with multiple interconnected systems
 
@@ -320,7 +320,7 @@ using (var transaction = new Transaction(doc, ""{{ACTION}} Complex {{CATEGORY}} 
             Category = "Modification",
             SecurityLevel = SecurityLevel.High,
             Tags = new List<string> { "delete", "remove", "modify", "cleanup" },
-            CodeTemplate = @"
+            Code = @"
 // Element Deletion Template
 // This template safely deletes elements with proper transaction handling
 
@@ -363,7 +363,7 @@ using (var transaction = new Transaction(doc, ""Delete {{CATEGORY}} Elements""))
             Category = "General",
             SecurityLevel = SecurityLevel.Safe,
             Tags = new List<string> { "general", "default" },
-            CodeTemplate = @"
+            Code = @"
 // Default Command Template
 // This template provides a safe execution environment for general commands
 

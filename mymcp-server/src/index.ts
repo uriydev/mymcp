@@ -23,6 +23,7 @@ async function main() {
   console.error("Available tools:");
   console.error("- execute_dynamic_revit_command: Выполнение любых команд на естественном языке");
   console.error("- revit_health_check: Проверка соединения с Revit");
+  console.error("- clear_command_cache: Очистка кэша динамических команд");
 }
 
 main(); 

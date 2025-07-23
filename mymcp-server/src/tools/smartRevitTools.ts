@@ -110,4 +110,48 @@ export function registerSmartRevitTools(server: McpServer) {
       }
     }
   );
+
+  // Инструмент для очистки кэша команд
+  server.tool(
+    "clear_command_cache",
+    "🧹 Clear the dynamic command cache to force regeneration of commands with latest code improvements",
+    {
+      force_clear: z.boolean().default(false).describe("Force clear all cached commands")
+    },
+    async (args: { force_clear: boolean }) => {
+      try {
+        const response = await revitConnection.sendCommand("clear_command_cache", {
+          force: args.force_clear
+        });
+
+        if (response.success) {
+          return {
+            content: [{
+              type: "text",
+              text: `🧹 **Кэш команд очищен успешно!**\n\n` +
+                    `📊 **Результат:** ${response.result}\n\n` +
+                    `💬 **Детали:** ${response.message}\n\n` +
+                    `🔄 **Теперь все команды будут регенерированы с обновленной логикой**`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ **Ошибка очистки кэша**\n\n` +
+                    `💬 **Сообщение:** ${response.message}`
+            }]
+          };
+        }
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `🔴 **Ошибка подключения к Revit**\n\n` +
+                  `❗ Ошибка: ${error instanceof Error ? error.message : String(error)}`
+          }]
+        };
+      }
+    }
+  );
 }

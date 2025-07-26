@@ -3,20 +3,14 @@ import { RevitConnection } from "../utils/revitConnection.js";
 const revitConnection = new RevitConnection();
 export function registerSmartRevitTools(server) {
     // Универсальный инструмент для динамических команд
-    server.tool("execute_dynamic_revit_command", "🚀 Execute ANY Revit command described in natural language with dynamic code generation! This is the most powerful tool that can handle any complex MEP, architectural, or engineering task.", {
-        command_description: z.string().describe("Natural language description of what you want to do in Revit (in Russian or English). Examples: 'Создай систему вентиляции для офиса', 'Create smart ductwork avoiding obstacles', 'Optimize existing MEP systems for energy efficiency'"),
-        complexity_level: z.enum(["simple", "moderate", "complex", "advanced"]).default("moderate").describe("Complexity level affects execution time and resource usage"),
-        safety_mode: z.boolean().default(true).describe("Enable additional safety checks and validation"),
-        optimization_level: z.enum(["speed", "quality", "balanced"]).default("balanced").describe("Optimization focus: speed for quick results, quality for best output, balanced for both"),
-        parameters: z.record(z.any()).optional().describe("Additional parameters as key-value pairs (coordinates, sizes, etc.)")
+    server.tool("execute_dynamic_revit_command", "🚀 Execute ANY Revit command described in natural language with dynamic code generation using Groq API!", {
+        command_description: z.string().describe("Natural language description of what you want to do in Revit (in Russian or English). Examples: 'create wall from 0,0,0 to 10,0,0', 'create door in the first wall', 'select all walls'"),
+        safety_mode: z.boolean().default(true).describe("Enable additional safety checks and validation")
     }, async (args) => {
         try {
-            const response = await revitConnection.sendCommand("execute_dynamic_command", {
+            const response = await revitConnection.sendCommand("execute_groq_command", {
                 description: args.command_description,
-                complexity: args.complexity_level,
-                safety: args.safety_mode,
-                optimization: args.optimization_level,
-                params: args.parameters
+                safety: args.safety_mode
             });
             if (response.success) {
                 return {
@@ -132,7 +126,7 @@ export function registerSmartRevitTools(server) {
                             `• Revit запущен\n` +
                             `• Плагин загружен\n` +
                             `• MCP сервер запущен\n` +
-                            `• Порт 3001 свободен`
+                            `• Порт 8080 свободен`
                     }]
             };
         }

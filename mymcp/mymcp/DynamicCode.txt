@@ -1,0 +1,45 @@
+// Шаблон для динамического кода Revit
+// Здесь будут доступны следующие переменные:
+// Document - текущий документ Revit
+// UiApplication - текущее приложение Revit UI
+// 
+// Код будет автоматически обернут в транзакцию
+
+// Импорты, которые доступны по умолчанию:
+// using System;
+// using System.Linq;
+// using System.Collections.Generic;
+// using Autodesk.Revit.DB;
+// using Autodesk.Revit.UI;
+// using Nice3point.Revit.Extensions;
+
+// Пример кода для создания стены:
+var level = Document.GetTypes<Level>().FirstOrDefault();
+var wallType = Document.GetTypes<WallType>().FirstOrDefault();
+var startPoint = new XYZ(0, 0, 0);
+var endPoint = new XYZ(10, 0, 0);
+var curve = Line.CreateBound(startPoint, endPoint);
+Wall.Create(Document, curve, wallType.Id, level.Id, 10, 0, false, false);
+
+// Пример кода для создания двери:
+// var wall = Document.GetInstances<Wall>().FirstOrDefault();
+// if (wall != null)
+// {
+//     var doorType = Document.GetTypes<FamilySymbol>()
+//         .Where(fs => fs.Category.Id.AreEquals(BuiltInCategory.OST_Doors))
+//         .FirstOrDefault();
+//     
+//     if (doorType != null)
+//     {
+//         if (!doorType.IsActive) doorType.Activate();
+//         var locationCurve = wall.Location as LocationCurve;
+//         var wallCurve = locationCurve.Curve;
+//         var midpoint = (wallCurve.GetEndPoint(0) + wallCurve.GetEndPoint(1)) / 2;
+//         Document.Create.NewFamilyInstance(midpoint, doorType, wall, level, StructuralType.NonStructural);
+//     }
+// }
+
+// Пример кода для выбора элементов:
+// var collector = new FilteredElementCollector(Document);
+// var walls = collector.OfClass(typeof(Wall)).ToElements();
+// TaskDialog.Show("Walls", $"Found {walls.Count} walls");

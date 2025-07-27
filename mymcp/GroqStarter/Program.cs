@@ -44,7 +44,10 @@ namespace GroqStarter
             try
             {
                 Console.Error.WriteLine($"DEBUG: Initializing Groq client with API key: {apiKey.Substring(0, 10)}...");
-                _groqClient = new GroqClient(apiKey, "gemma2-9b-it")
+                // _groqClient = new GroqClient(apiKey, "gemma2-9b-it")
+                // _groqClient = new GroqClient(apiKey, "deepseek-r1-distill-llama-70b")
+                // _groqClient = new GroqClient(apiKey, "qwen/qwen3-32b")
+                _groqClient = new GroqClient(apiKey, "moonshotai/kimi-k2-instruct")
                     .SetTemperature(0.5)
                     .SetMaxTokens(512)
                     .SetTopP(1)
@@ -93,26 +96,42 @@ namespace GroqStarter
             {
                 Console.Error.WriteLine($"DEBUG: Starting code generation for command: {command}");
                 
-                var systemPrompt = @"You are a specialized Revit API code generator. Generate ONLY C# code for Revit API based on the user's natural language command.
-Important rules:
-1. Generate ONLY the C# code inside a transaction, without using statements, class or method declarations
-2. Use only Revit API calls that would work within a transaction  
-3. Assume variables 'Document' and 'UiApplication' are already available
-4. Keep your code concise but complete for the requested operation
-5. DO NOT include Transaction start/commit - that's already handled
-6. DO NOT add comments or explanations, ONLY code
-7. Use standard Revit API methods
+                var systemPrompt = 
+                    @"You are a Revit API code generator. Generate ONLY clean C# code without any explanations, markdown blocks, or comments.
 
-Example command: 'create wall'
-Example output:
-Level level = null;
-foreach (Level l in new FilteredElementCollector(Document).OfClass(typeof(Level))) { level = l; break; }
-WallType wallType = null;
-foreach (WallType wt in new FilteredElementCollector(Document).OfClass(typeof(WallType))) { wallType = wt; break; }
-var startPoint = new XYZ(0, 0, 0);
-var endPoint = new XYZ(10, 0, 0);
-var curve = Line.CreateBound(startPoint, endPoint);
-Wall.Create(Document, curve, wallType.Id, level.Id, 10, 0, false, false);";
+                    STRICT OUTPUT RULES:
+                    - Output only executable C# code
+                    - No ```csharp blocks
+                    - No explanations or text
+                    - No <think> tags
+                    - No comments in code
+
+                    CODE REQUIREMENTS:
+                    - Use only variables: Document, UiApplication  
+                    - No using statements, classes, or methods
+                    - No transactions (already handled)
+                    - No return statements
+                    - Include null checks: if (obj == null) throw new Exception(""message"");
+
+                    FIND ELEMENTS PATTERN:
+                    Level level = new FilteredElementCollector(Document).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
+                    if (level == null) throw new Exception(""No level found"");
+
+                    WALL CREATION:
+                    WallType wallType = new FilteredElementCollector(Document).OfClass(typeof(WallType)).Cast<WallType>().FirstOrDefault();
+                    if (wallType == null) throw new Exception(""No wall type found"");
+                    Line wallLine = Line.CreateBound(new XYZ(x1,y1,z1), new XYZ(x2,y2,z2));
+                    Wall.Create(Document, wallLine, wallType.Id, level.Id, height, 0.0, false, false);
+
+                    FLOOR CREATION:
+                    FloorType floorType = new FilteredElementCollector(Document).OfClass(typeof(FloorType)).Cast<FloorType>().FirstOrDefault();
+                    if (floorType == null) throw new Exception(""No floor type found"");
+                    CurveArray curves = new CurveArray();
+                    [add boundary curves]
+                    Floor.Create(Document, curves, floorType.Id, level.Id);
+
+                    Use realistic dimensions (residential: 3-15m, heights: 2.5-3.5m).
+                    Generate only the C# code that creates the requested Revit elements.";
 
                 Console.Error.WriteLine("DEBUG: Sending request to Groq API...");
                 var response = await _groqClient.CreateChatCompletionAsync(

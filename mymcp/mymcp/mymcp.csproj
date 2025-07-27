@@ -54,11 +54,20 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0"/>
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4"/>
         <PackageReference Include="System.Reflection.Metadata" Version="7.0.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Scripting" Version="4.8.0" />
     </ItemGroup>
 
     <ItemGroup>
         <Resource Include="Resources\Icons\RibbonIcon16.png"/>
         <Resource Include="Resources\Icons\RibbonIcon32.png"/>
     </ItemGroup>
+
+    <Target Name="CopyGroqStarter" AfterTargets="Build">
+        <ItemGroup>
+            <GroqStarterFiles Include="$(SolutionDir)GroqStarter\bin\$(Configuration)\net9.0\**\*.*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(GroqStarterFiles)" DestinationFolder="$(OutputPath)\%(RecursiveDir)" />
+    </Target>
 
 </Project>
